@@ -69,10 +69,9 @@ namespace Kogane
 			var instance         = GetInstance();
 			var serializedObject = new SerializedObject( instance );
 			var keywords         = SettingsProvider.GetSearchKeywordsFromSerializedObject( serializedObject );
-			var editor           = Editor.CreateEditor( instance );
 			var provider         = new SettingsProvider( settingsProviderPath, SettingsScope.User, keywords );
 
-			provider.guiHandler += _ => OnGuiHandler( editor, onGUI, onGUIExtra );
+			provider.guiHandler += _ => OnGuiHandler( onGUI, onGUIExtra );
 
 			return provider;
 		}
@@ -82,11 +81,13 @@ namespace Kogane
 		/// </summary>
 		private static void OnGuiHandler
 		(
-			Editor                   editor,
 			Action<SerializedObject> onGUI,
 			Action<SerializedObject> onGUIExtra
 		)
 		{
+			var instance = GetInstance();
+			var editor   = Editor.CreateEditor( instance );
+
 			using ( var scope = new EditorGUI.ChangeCheckScope() )
 			{
 				var serializedObject = editor.serializedObject;
