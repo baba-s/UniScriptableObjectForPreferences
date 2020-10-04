@@ -18,20 +18,25 @@ namespace Kogane
 		private static T m_instance;
 
 		//================================================================================
+		// プロパティ(static)
+		//================================================================================
+		private static string ConfigName => typeof( T ).Name;
+
+		//================================================================================
 		// 関数(static)
 		//================================================================================
 		/// <summary>
 		/// EditorUserSettings から ScriptableObject のインスタンスを読み込んで返します
 		/// EditorUserSettings に保存されていない場合は ScriptableObject のインスタンスを新規作成して返します
 		/// </summary>
-		private static T CreateOrLoadFromJson( string configName )
+		public static T GetInstance()
 		{
 			// 既にインスタンスを作成もしくは読み込み済みの場合はそれを返す
 			if ( m_instance != null ) return m_instance;
 
 			// EditorUserSettings から JSON 形式で ScriptableObject を読み込む
 			m_instance = CreateInstance<T>();
-			var json = EditorUserSettings.GetConfigValue( configName );
+			var json = EditorUserSettings.GetConfigValue( ConfigName );
 			EditorJsonUtility.FromJsonOverwrite( json, m_instance );
 
 			// EditorUserSettings に保存されていなかった場合は
@@ -50,31 +55,24 @@ namespace Kogane
 		public static SettingsProvider CreateSettingsProvider
 		(
 			[CanBeNull] string                   settingsProviderPath = null,
-			[CanBeNull] string                   configName           = null,
-			[CanBeNull] Action<SerializedObject> onGUI                = null
+			[CanBeNull] Action<SerializedObject> onGUI                = null,
+			[CanBeNull] Action<SerializedObject> onGUIExtra           = null
 		)
 		{
-			// Preferences のパスが指定されていない場合はデフォルト値を使用する
 			if ( settingsProviderPath == null )
 			{
 				settingsProviderPath = $"Kogane/{typeof( T ).Name}";
 			}
 
-			// EditorUserSettings の名前が指定されていない場合はデフォルト値を使用する
-			if ( configName == null )
-			{
-				configName = typeof( T ).Name;
-			}
-
 			// ScriptableObject のインスタンスを新規作成もしくは EditorUserSettings から読み込む
 			// ScriptableObject の GUI を表示する SettingsProvider を作成する
-			var instance         = CreateOrLoadFromJson( configName );
+			var instance         = GetInstance();
 			var serializedObject = new SerializedObject( instance );
 			var keywords         = SettingsProvider.GetSearchKeywordsFromSerializedObject( serializedObject );
 			var editor           = Editor.CreateEditor( instance );
 			var provider         = new SettingsProvider( settingsProviderPath, SettingsScope.User, keywords );
 
-			provider.guiHandler += _ => OnGuiHandler( editor, configName, onGUI );
+			provider.guiHandler += _ => OnGuiHandler( editor, onGUI, onGUIExtra );
 
 			return provider;
 		}
@@ -85,8 +83,8 @@ namespace Kogane
 		private static void OnGuiHandler
 		(
 			Editor                   editor,
-			string                   configName,
-			Action<SerializedObject> onGUI
+			Action<SerializedObject> onGUI,
+			Action<SerializedObject> onGUIExtra
 		)
 		{
 			using ( var scope = new EditorGUI.ChangeCheckScope() )
@@ -106,6 +104,8 @@ namespace Kogane
 					editor.DrawDefaultInspector();
 				}
 
+				onGUIExtra?.Invoke( serializedObject );
+
 				if ( !scope.changed ) return;
 
 				// パラメータが編集された場合は インスタンスに反映して
@@ -113,7 +113,7 @@ namespace Kogane
 				serializedObject.ApplyModifiedProperties();
 
 				var json = EditorJsonUtility.ToJson( editor.target );
-				EditorUserSettings.SetConfigValue( configName, json );
+				EditorUserSettings.SetConfigValue( ConfigName, json );
 			}
 		}
 	}
